@@ -1,7 +1,7 @@
 const https = require('https');
 const express = require('express');
 
-const token = process.env['SHOPIFY_ACCESS_TOKEN'];
+const token = process.env.SHOPIFY_ACCESS_TOKEN;
 const PRODUCTS_PER_REQUEST = 250;
 
 const app = express();
@@ -38,6 +38,7 @@ async function fetchOmnivore() {
                 .on('end', () => resolve(data))
                 .on('error', error => reject(error));
         });
+
     });
 }
 
@@ -53,12 +54,15 @@ async function buildPriceList(){
         parsedProducts.push(...productResponse.products)
     }
     while(productResponse.nextLink)    
+
+    
     
     return new Promise((resolve, reject) => {
 
         resolve(mapList(parsedProducts));
 
     });
+
 };
 
 // GET request to Shopify to fetch product details. Max 250 records per request
@@ -94,20 +98,27 @@ async function fetchProducts(nextLink){
 
 }
 
-// Parse JSON string into object
+// Parse JSON string into object, return ID of last product if product count == 250
 var parseProducts = (json) => JSON.parse(json).products;
 
-// Strip away unwanted fields leaving only the IDs and prices of the variants
+// Strip away unwanted fields leaving only the IDs and prices of the variants. 
+// For items with a single variant, product ID will be retained. 
+// For multi variant items, variant ID will be retained.
 function mapList(products){
 
     return products.map(function(p){
           
-        return p.variants.map(function(v){
+        return p.variants.length > 1 ? p.variants.map(function(v){
             return {
                 id: v.id,
                 price: v.price,
                 compare_at_price: v.compare_at_price
             }
-        })    
+        }) : {
+            id: p.id,
+            price: p.variants[0].price,
+            compare_at_price: p.variants[0].compare_at_price
+        }
+    
     }).flatMap(p => p);
 }
