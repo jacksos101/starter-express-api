@@ -3,6 +3,8 @@ const express = require('express');
 
 const app = express();
 
+app.disable('etag');
+
 app.all('/', (req, res) => {
 
     const options = {
@@ -15,7 +17,12 @@ app.all('/', (req, res) => {
     https.get(options, response => {    
         response
             .on('data', chunk => data += chunk)
-            .on('end', () => res.send(data))
+            .on('end', () => {                
+                res.set({
+                    'Content-Type': 'text/xml;charset=utf-8'
+                });
+                res.send(data);
+            })
             .on('error', error => res.send(error));
     });
 });
