@@ -1,7 +1,7 @@
 const https = require('https');
 const express = require('express');
 
-const token = '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';
+const token = process.env['SHOPIFY_ACCESS_TOKEN'];
 const PRODUCTS_PER_REQUEST = 250;
 
 const app = express();
