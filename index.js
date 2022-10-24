@@ -38,7 +38,6 @@ async function fetchOmnivore() {
                 .on('end', () => resolve(data))
                 .on('error', error => reject(error));
         });
-
     });
 }
 
@@ -54,15 +53,12 @@ async function buildPriceList(){
         parsedProducts.push(...productResponse.products)
     }
     while(productResponse.nextLink)    
-
-    
     
     return new Promise((resolve, reject) => {
 
         resolve(mapList(parsedProducts));
 
     });
-
 };
 
 // GET request to Shopify to fetch product details. Max 250 records per request
@@ -98,7 +94,7 @@ async function fetchProducts(nextLink){
 
 }
 
-// Parse JSON string into object, return ID of last product if product count == 250
+// Parse JSON string into object
 var parseProducts = (json) => JSON.parse(json).products;
 
 // Strip away unwanted fields leaving only the IDs and prices of the variants
@@ -112,7 +108,6 @@ function mapList(products){
                 price: v.price,
                 compare_at_price: v.compare_at_price
             }
-        })
-    
+        })    
     }).flatMap(p => p);
 }
