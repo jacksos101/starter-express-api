@@ -1,7 +1,23 @@
-const express = require('express')
-const app = express()
+const https = require('https');
+const express = require('express');
+
+const app = express();
+
 app.all('/', (req, res) => {
-    console.log("Just got a request!")
-    res.send('Modified product feed goes here.')
-})
-app.listen(process.env.PORT || 3000)
+
+    const options = {
+        host: `m1.omnivore.com.au`,
+        path: `/v1/retailers/persian-rug-gallery-8881/products/facebook?secret=3O4vOvGpmvBo0lqE1P9D`
+    }
+
+    let data = '';
+    
+    https.get(options, response => {    
+        response
+            .on('data', chunk => data += chunk)
+            .on('end', () => res.send(data))
+            .on('error', error => res.send(error));
+    });
+});
+
+app.listen(process.env.PORT || 3000);
