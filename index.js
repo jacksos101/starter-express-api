@@ -12,7 +12,7 @@ const app = express();
 
 app.disable('etag');
 
-app.all('/', async (req, res) => {
+app.all('/omnivore-fb-feed', async (req, res) => {
 
     res.set({
         'Content-Type': 'application/xml;charset=utf-8'
