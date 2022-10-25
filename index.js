@@ -78,7 +78,7 @@ function retrievePrices(priceList, productId){
 
     return {
         price: product.compare_at_price || product.price,
-        sale_price: product.compare_at_price ? product.price : 1
+        sale_price: product.compare_at_price ? product.price : undefined
     }
 }
 
