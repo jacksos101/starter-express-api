@@ -53,14 +53,16 @@ async function correctXMLPrices(){
                 } else {
                     i['g:sale_price'] = [`${prices.sale_price} NZD`]
                 }
+            } else {
+                if(i['g:sale_price']) delete i['g:sale_price'];
             }
         }
         
-        i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
+        //i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
 
     });
 
-    const builder = new xml2js.Builder();
+    const builder = new xml2js.Builder({cdata: true});
 
     result.rss.channel[0].item = parsedItems;
 
