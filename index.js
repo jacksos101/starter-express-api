@@ -41,6 +41,9 @@ async function correctXMLPrices(){
 
     parsedItems = result.rss.channel[0].item;
 
+    // Items that have been removed from shopify, but are still on the Omnivore feed
+    let staleItems = [];
+
     parsedItems.forEach(i => {
 
         let prices = retrievePrices(productPrices, i['g:id'][0]);
@@ -57,9 +60,19 @@ async function correctXMLPrices(){
                 if(i['g:sale_price']) delete i['g:sale_price'];
             }
         }
+        else {
+            // If the product is not active on the Shopify API, it should be removed from the XML
+            staleItems.push(i);
+        }
         
         //i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
 
+    });
+
+    // Remove stale items from the array
+    staleItems.forEach(i => {
+        let index = parsedItems.indexOf(i);
+        parsedItems.splice(index, index);
     });
 
     const builder = new xml2js.Builder({cdata: true});
@@ -77,6 +90,8 @@ function retrievePrices(priceList, productId){
     let product = priceList.find(p => p.id == productId);
 
     if(!product) return false;
+
+    if(product.status != 'active' || product.inventory == 0) return false;
 
     return {
         price: product.compare_at_price || product.price,
@@ -134,7 +149,7 @@ async function fetchProducts(nextLink){
 
         const options = {
             host: `persian-rug-gallery-8881.myshopify.com`,
-            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,variants${nextLink ? `&${nextLink}` : ``}`,
+            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,status,variants${nextLink ? `&${nextLink}` : ``}`,
             headers: {
                 'Content-Type': 'application/json',
                 'X-Shopify-Access-Token': token
@@ -174,12 +189,16 @@ function mapList(products){
             return {
                 id: v.id,
                 price: v.price,
-                compare_at_price: v.compare_at_price
+                compare_at_price: v.compare_at_price,
+                status: p.status,
+                inventory: v.inventory_quantity
             }
         }) : {
             id: p.id,
             price: p.variants[0].price,
-            compare_at_price: p.variants[0].compare_at_price
+            compare_at_price: p.variants[0].compare_at_price,
+            status: p.status,
+            inventory: p.variants[0].inventory_quantity
         }
     
     }).flatMap(p => p);
