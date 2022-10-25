@@ -22,6 +22,14 @@ app.all('/omnivore-fb-feed', async (req, res) => {
     
 });
 
+app.all('/shopify-feed', async (req, res) => {
+
+    res.set({'Content-Type': 'application/json;charset=utf-8'})
+
+    res.send(await fetchAllShopifyProducts());
+
+});
+
 app.listen(process.env.PORT || 3000);
 
 // ------------------
@@ -29,7 +37,7 @@ app.listen(process.env.PORT || 3000);
 // replace the Omnivore prices with the correct prices. Return the corrected XML.
 async function correctXMLPrices(){
 
-    let productPrices = await buildPriceList();
+    let productPrices = processShopifyProductList(await fetchAllShopifyProducts());
 
     let originalXML = await fetchOmnivore();
 
@@ -72,7 +80,7 @@ async function correctXMLPrices(){
     // Remove stale items from the array
     staleItems.forEach(i => {
         let index = parsedItems.indexOf(i);
-        parsedItems.splice(index, index);
+        parsedItems.splice(index, 1);
     });
 
     const builder = new xml2js.Builder({cdata: true});
@@ -121,13 +129,13 @@ async function fetchOmnivore() {
 
 
 // Returns json object of all products - IDs, variants, and prices - compare-with price, if applicable
-async function buildPriceList(){
+async function fetchAllShopifyProducts(){
 
     let parsedProducts = [];
     let productResponse = {};
 
     do{
-        productResponse = await fetchProducts(productResponse.nextLink);
+        productResponse = await fetchShopifyProducts(productResponse.nextLink);
         parsedProducts.push(...productResponse.products)
     }
     while(productResponse.nextLink)    
@@ -136,20 +144,20 @@ async function buildPriceList(){
     
     return new Promise((resolve, reject) => {
 
-        resolve(mapList(parsedProducts));
+        resolve(parsedProducts);
 
     });
 
 };
 
 // GET request to Shopify to fetch product details. Max 250 records per request
-async function fetchProducts(nextLink){
+async function fetchShopifyProducts(nextLink){
 
     return new Promise((resolve, reject) => {
 
         const options = {
             host: `persian-rug-gallery-8881.myshopify.com`,
-            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,status,variants${nextLink ? `&${nextLink}` : ``}`,
+            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,title,status,variants${nextLink ? `&${nextLink}` : ``}`,
             headers: {
                 'Content-Type': 'application/json',
                 'X-Shopify-Access-Token': token
@@ -162,7 +170,7 @@ async function fetchProducts(nextLink){
 
             let linkHeader = response.headers['link'];
             const match = linkHeader.match(/page_info=\w+/g);
-            const hasNext = linkHeader.match(/next/);
+            const hasNext = !!linkHeader.match(/next/);
 
             let nextLink = hasNext && match ? match[match.length-1] : false;
 
@@ -181,13 +189,14 @@ var parseProducts = (json) => JSON.parse(json).products;
 // Strip away unwanted fields leaving only the IDs and prices of the variants. 
 // For items with a single variant, product ID will be retained. 
 // For multi variant items, variant ID will be retained.
-function mapList(products){
+function processShopifyProductList(products){
 
     return products.map(function(p){
           
         return p.variants.length > 1 ? p.variants.map(function(v){
             return {
                 id: v.id,
+                title: p.title,
                 price: v.price,
                 compare_at_price: v.compare_at_price,
                 status: p.status,
@@ -195,6 +204,7 @@ function mapList(products){
             }
         }) : {
             id: p.id,
+            title: p.title,
             price: p.variants[0].price,
             compare_at_price: p.variants[0].compare_at_price,
             status: p.status,
