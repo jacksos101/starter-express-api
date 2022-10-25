@@ -1,5 +1,9 @@
+require('dotenv').config();
+
 const https = require('https');
 const express = require('express');
+const xml2js = require('xml2js');
+const stripHtml = require('string-strip-html')
 
 const token = process.env.SHOPIFY_ACCESS_TOKEN;
 const PRODUCTS_PER_REQUEST = 250;
@@ -11,16 +15,72 @@ app.disable('etag');
 app.all('/', async (req, res) => {
 
     res.set({
-        'Content-Type': 'application/json;charset=utf-8'
+        'Content-Type': 'application/xml;charset=utf-8'
     });
     
-    res.send(await buildPriceList());
+    res.send(await correctXMLPrices());
     
 });
 
 app.listen(process.env.PORT || 3000);
 
 // ------------------
+// Retrieve product feed from Omnivore, retrieve product prices from Shopify, and 
+// replace the Omnivore prices with the correct prices. Return the corrected XML.
+async function correctXMLPrices(){
+
+    let productPrices = await buildPriceList();
+
+    let originalXML = await fetchOmnivore();
+
+    let parsedItems;
+
+    const parser = new xml2js.Parser();
+
+    let result = await parser.parseStringPromise(originalXML);
+
+    parsedItems = result.rss.channel[0].item;
+
+    parsedItems.forEach(i => {
+
+        let prices = retrievePrices(productPrices, i['g:id'][0]);
+
+        if(prices){
+            if(prices.price) i['g:price'][0] = `${prices.price} NZD`;
+            if(prices.sale_price) {
+                if(i['g:sale_price']){
+                    i['g:sale_price'][0] = `${prices.sale_price} NZD`
+                } else {
+                    i['g:sale_price'] = [`${prices.sale_price} NZD`]
+                }
+            }
+        }
+        
+        i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
+
+    });
+
+    const builder = new xml2js.Builder();
+
+    result.rss.channel[0].item = parsedItems;
+
+    const xml = builder.buildObject(result);
+
+    return xml;
+
+}
+
+// Return the correct prices for the supplied product
+function retrievePrices(priceList, productId){
+    let product = priceList.find(p => p.id == productId);
+
+    if(!product) return false;
+
+    return {
+        price: product.compare_at_price || product.price,
+        sale_price: product.compare_at_price ? product.price : 1
+    }
+}
 
 // Retrieve the XML document from Omnivore, containing products to be listted on Facebook.
 async function fetchOmnivore() {
