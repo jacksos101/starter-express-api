@@ -73,7 +73,11 @@ async function correctXMLPrices(){
             staleItems.push(i);
         }
         
+        // Strip HTML from description
         //i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
+
+        // Append query parameter 'ref=fbcommerce' to the link
+        i['link'][0] = i['link'][0] += '?ref=metacommerce';
 
     });
 
