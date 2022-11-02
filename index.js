@@ -7,6 +7,7 @@ const stripHtml = require('string-strip-html')
 
 const token = process.env.SHOPIFY_ACCESS_TOKEN;
 const PRODUCTS_PER_REQUEST = 250;
+const DISPLAY_WAS_NOW_PRICING = false // should Facebook display RRP vs price, or just the price?
 
 const app = express();
 
@@ -105,9 +106,13 @@ function retrievePrices(priceList, productId){
 
     if(product.status != 'active' || product.inventory == 0) return false;
 
-    return {
+    return DISPLAY_WAS_NOW_PRICING ? 
+    {
         price: product.compare_at_price || product.price,
         sale_price: product.compare_at_price ? product.price : undefined
+    } : 
+    { 
+        price: product.price
     }
 }
 
