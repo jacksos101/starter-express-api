@@ -19,8 +19,18 @@ app.all('/omnivore-fb-feed', async (req, res) => {
         'Content-Type': 'application/xml;charset=utf-8'
     });
     
-    res.send(await correctXMLPrices());
+    res.send(await buildFacebookFeed());
     
+});
+
+app.all('/omnivore-google-feed', async (req, res) => {
+    
+    res.set({
+        'Content-Type': 'application/xml;charset=utf-8'
+    });
+
+    res.send(await buildGoogleFeed());
+
 });
 
 app.all('/shopify-feed', async (req, res) => {
@@ -34,13 +44,44 @@ app.all('/shopify-feed', async (req, res) => {
 app.listen(process.env.PORT || 3000);
 
 // ------------------
+
+// Retrieve Google feed from Omnivore, correct all URLs and remove shipping information
+async function buildGoogleFeed(){
+
+    let originalXML = await fetchOmnivoreGoogle();
+
+    let parser = new xml2js.Parser();
+
+    let parsedData = await parser.parseStringPromise(originalXML);
+
+    let products = parsedData.rss.channel[0].item;
+
+    products.forEach(p => {
+
+        if(p['g:shipping']) delete p['g:shipping']; // remove all shipping information
+
+        p['link'][0] = p['link'][0].replace('persian-rug-gallery-8881.myshopify.com', 'persianruggallery.co.nz'); // replace old URL if present
+
+    });
+
+    parsedData.rss.channel[0].item = products;
+
+    const builder = new xml2js.Builder({cdata: true});
+
+    const xml = builder.buildObject(parsedData);
+
+    return xml;
+    
+}
+
+
 // Retrieve product feed from Omnivore, retrieve product prices from Shopify, and 
 // replace the Omnivore prices with the correct prices. Return the corrected XML.
-async function correctXMLPrices(){
+async function buildFacebookFeed(){
 
     let productPrices = processShopifyProductList(await fetchAllShopifyProducts());
 
-    let originalXML = await fetchOmnivore();
+    let originalXML = await fetchOmnivoreFacebook();
 
     let parsedItems;
 
@@ -117,7 +158,7 @@ function retrievePrices(priceList, productId){
 }
 
 // Retrieve the XML document from Omnivore, containing products to be listted on Facebook.
-async function fetchOmnivore() {
+async function fetchOmnivoreFacebook() {
     return new Promise((resolve, reject) => {
 
         const options = {
@@ -136,6 +177,26 @@ async function fetchOmnivore() {
     });
 }
 
+
+// Retrieve XML document from Omnivore, containing products to be listted on Google.
+async function fetchOmnivoreGoogle() {
+    return new Promise((resolve, reject) => {
+
+        const options = {
+            host: `m1.omnivore.com.au`,
+            path: `/v1/retailers/persian-rug-gallery-8881/products/googleads?secret=evaq4lluSA&type=xml`    }
+    
+        let data = '';
+        
+        https.get(options, response => {    
+            response
+                .on('data', chunk => data += chunk)
+                .on('end', () => resolve(data))
+                .on('error', error => reject(error));
+        });
+
+    });
+}
 
 // Returns json object of all products - IDs, variants, and prices - compare-with price, if applicable
 async function fetchAllShopifyProducts(){
