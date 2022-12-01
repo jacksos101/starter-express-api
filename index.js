@@ -62,6 +62,14 @@ async function buildGoogleFeed(){
 
         p['link'][0] = p['link'][0].replace('persian-rug-gallery-8881.myshopify.com', 'persianruggallery.co.nz'); // replace old URL if present
 
+        // If product is not machine made, remove gtin and mpn fields, and tell Google that no product code exists
+        console.log(p['g:product_type']);
+        if(!p['g:product_type'][0].includes('Machine')){
+            if(p['g:gtin']) delete p['g:gtin'];
+            if(p['g:mpn']) delete p['g:mpn'];
+            p['identifier_exists'] = false;
+        }
+
     });
 
     parsedData.rss.channel[0].item = products;
