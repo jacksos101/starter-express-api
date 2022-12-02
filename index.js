@@ -71,7 +71,7 @@ async function buildGoogleFeed(){
             // Else if product is machine made, add to the link URL so that the correct variant is preselected
             if(p['g:id'][0].indexOf(`-`) != -1) {
                 let variant = p['g:id'][0].slice(p['g:id'][0].indexOf(`-`)+1);
-                p['link'] = p['link'] += `?variant=${variant}`;
+                p['link'] = p['link'] += `?variant=${variant}&ref=google-shopping`;
             }
         }
     });
