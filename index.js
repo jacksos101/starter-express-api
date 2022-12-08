@@ -7,7 +7,7 @@ const stripHtml = require('string-strip-html')
 
 const token = process.env.SHOPIFY_ACCESS_TOKEN;
 const PRODUCTS_PER_REQUEST = 250;
-const DISPLAY_WAS_NOW_PRICING = false // should Facebook display RRP vs price, or just the price?
+const DISPLAY_WAS_NOW_PRICING = true // should Facebook display RRP vs price, or just the price?
 
 const app = express();
 
