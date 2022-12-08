@@ -67,7 +67,7 @@ async function buildGoogleFeed(){
             if(p['g:gtin']) delete p['g:gtin'];
             if(p['g:mpn']) delete p['g:mpn'];
             p['identifier_exists'] = false;
-            p['link'] = p['link'] += `ref=google-shopping`; // for meta pixel
+            p['link'] = p['link'] += `?ref=google-shopping`; // for meta pixel
         } else{
             // Else if product is machine made, add to the link URL so that the correct variant is preselected
             if(p['g:id'][0].indexOf(`-`) != -1) {
