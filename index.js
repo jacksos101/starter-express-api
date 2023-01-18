@@ -50,6 +50,9 @@ async function buildGoogleFeed(){
 
     let originalXML = await fetchOmnivoreGoogle();
 
+    // Need this for the 'weight' field, as we use this field to smuggle RRP price 
+    let shopifyData = processShopifyProductList(await fetchAllShopifyProducts());
+
     let parser = new xml2js.Parser();
 
     let parsedData = await parser.parseStringPromise(originalXML);
@@ -58,7 +61,31 @@ async function buildGoogleFeed(){
 
     products.forEach(p => {
 
+        let id = p['g:id'][0].indexOf('-') ? p['g:id'][0].split('-')[1] : p['g:id'][0]
+
+        let prices = retrievePrices(shopifyData, id);
+
+        // Items that have been removed from shopify, but are still on the Omnivore feed
+        let staleItems = [];
+
         if(p['g:shipping']) delete p['g:shipping']; // remove all shipping information
+
+        if(prices){
+            if(prices.price) p['g:price'][0] = `${prices.price} NZD`;
+            if(prices.sale_price) {
+                if(p['g:sale_price']){
+                    p['g:sale_price'][0] = `${prices.sale_price} NZD`
+                } else {
+                    p['g:sale_price'] = [`${prices.sale_price} NZD`]
+                }
+            } else {
+                if(p['g:sale_price']) delete p['g:sale_price'];
+            }
+        }
+        else {
+            // If the product is not active on the Shopify API, it should be removed from the XML
+            staleItems.push(p);
+        }
 
         p['link'][0] = p['link'][0].replace('persian-rug-gallery-8881.myshopify.com', 'persianruggallery.co.nz'); // replace old URL if present
 
@@ -75,6 +102,12 @@ async function buildGoogleFeed(){
                 p['link'] = p['link'] += `?variant=${variant}&ref=google-shopping`; // also for meta pixel
             }
         }
+    });
+
+    // Remove stale items from the array
+    products.forEach(i => {
+        let index = products.indexOf(i);
+        products.splice(index, 1);
     });
 
     parsedData.rss.channel[0].item = products;
@@ -240,7 +273,7 @@ async function fetchShopifyProducts(nextLink){
 
         const options = {
             host: `persian-rug-gallery-8881.myshopify.com`,
-            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,title,status,variants${nextLink ? `&${nextLink}` : ``}`,
+            path: `/admin/api/2022-10/products.json?limit=${PRODUCTS_PER_REQUEST}&fields=id,title,status,variants,metafields${nextLink ? `&${nextLink}` : ``}`,
             headers: {
                 'Content-Type': 'application/json',
                 'X-Shopify-Access-Token': token
@@ -275,13 +308,16 @@ var parseProducts = (json) => JSON.parse(json).products;
 function processShopifyProductList(products){
 
     return products.map(function(p){
+          if(p.id == 7803520385240){
+            console.log('');
+          }
           
         return p.variants.length > 1 ? p.variants.map(function(v){
             return {
                 id: v.id,
                 title: p.title,
                 price: v.price,
-                compare_at_price: v.compare_at_price,
+                compare_at_price: v.weight.toFixed(2),
                 status: p.status,
                 inventory: v.inventory_quantity
             }
@@ -289,7 +325,7 @@ function processShopifyProductList(products){
             id: p.id,
             title: p.title,
             price: p.variants[0].price,
-            compare_at_price: p.variants[0].compare_at_price,
+            compare_at_price: p.variants[0].weight.toFixed(2),
             status: p.status,
             inventory: p.variants[0].inventory_quantity
         }
