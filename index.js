@@ -59,32 +59,33 @@ async function buildGoogleFeed(){
 
     let products = parsedData.rss.channel[0].item;
 
+    // Items that should not be on the feed because they are inactive, out of stock, or not found on Shopify.
+    let staleProducts = [];
+
     products.forEach(p => {
-
-        let id = p['g:id'][0].indexOf('-') ? p['g:id'][0].split('-')[1] : p['g:id'][0]
-
-        let prices = retrievePrices(shopifyData, id);
-
-        // Items that have been removed from shopify, but are still on the Omnivore feed
-        let staleItems = [];
+        let prices = retrievePrices(shopifyData, p['g:id'][0]);
 
         if(p['g:shipping']) delete p['g:shipping']; // remove all shipping information
+
+        // delete shipping weight (we are hijacking this field to smuggle the RRP price)
+        if(p['g:shipping_weight']) delete p['g:shipping_weight'];
 
         if(prices){
             if(prices.price) p['g:price'][0] = `${prices.price} NZD`;
             if(prices.sale_price) {
                 if(p['g:sale_price']){
-                    p['g:sale_price'][0] = `${prices.sale_price} NZD`
+                    p['g:sale_price'][0] = `${prices.sale_price} NZD`;
                 } else {
-                    p['g:sale_price'] = [`${prices.sale_price} NZD`]
+                    p['g:sale_price'] = [`${prices.sale_price} NZD`];
                 }
             } else {
                 if(p['g:sale_price']) delete p['g:sale_price'];
+                console.log(`No sale price for ${p['g:id'][0]} - ${p['g:title'][0]}`);
             }
         }
         else {
             // If the product is not active on the Shopify API, it should be removed from the XML
-            staleItems.push(p);
+            staleProducts.push(p);
         }
 
         p['link'][0] = p['link'][0].replace('persian-rug-gallery-8881.myshopify.com', 'persianruggallery.co.nz'); // replace old URL if present
@@ -105,7 +106,7 @@ async function buildGoogleFeed(){
     });
 
     // Remove stale items from the array
-    products.forEach(i => {
+    staleProducts.forEach(i => {
         let index = products.indexOf(i);
         products.splice(index, 1);
     });
@@ -148,12 +149,13 @@ async function buildFacebookFeed(){
             if(prices.price) i['g:price'][0] = `${prices.price} NZD`;
             if(prices.sale_price) {
                 if(i['g:sale_price']){
-                    i['g:sale_price'][0] = `${prices.sale_price} NZD`
+                    i['g:sale_price'][0] = `${prices.sale_price} NZD`;
                 } else {
-                    i['g:sale_price'] = [`${prices.sale_price} NZD`]
+                    i['g:sale_price'] = [`${prices.sale_price} NZD`];
                 }
             } else {
                 if(i['g:sale_price']) delete i['g:sale_price'];
+                console.log(`No sale price for ${i['g:id'][0]} - ${i['g:title'][0]}`);
             }
         }
         else {
@@ -161,6 +163,9 @@ async function buildFacebookFeed(){
             staleItems.push(i);
         }
         
+        // delete shipping weight (we are hijacking this field to smuggle the RRP price)
+        if(i['g:shipping_weight']) delete i['g:shipping_weight'];
+
         // Strip HTML from description
         //i['description'][0] = stripHtml.stripHtml(i['description'][0]).result;
 
@@ -186,12 +191,39 @@ async function buildFacebookFeed(){
 }
 
 // Return the correct prices for the supplied product
-function retrievePrices(priceList, productId){
+function retrievePrices(priceList, idString){
+
+    let productId;
+    let alternateId;
+
+    if(idString.indexOf('-') != -1){
+        productId = idString.split('-')[1];
+        alternateId = idString.split('-')[0];
+    } else {
+        productId = idString;
+    }
+
     let product = priceList.find(p => p.id == productId);
 
-    if(!product) return false;
+    if(!product){
+        // If the product has options, but only one variant, look for it under the main product ID instead of the variant ID.
+        if(alternateId) product = priceList.find(p => p.id == alternateId);
 
-    if(product.status != 'active' || product.inventory == 0) return false;
+        if(!product){
+            console.log(`Product ${productId} was not found on Shopify, excluding from product feed.`);
+            return false;
+        }        
+    };
+
+    if(product.status != 'active'){
+        console.log(`Product ${productId} is not active, excluding from product feed.`);
+        return false;
+    }
+
+    if(product.inventory < 1){
+        console.log(`Product ${productId} is out of stock, excluding from product feed.`);
+        return false;
+    }
 
     return DISPLAY_WAS_NOW_PRICING ? 
     {
