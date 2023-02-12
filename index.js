@@ -7,7 +7,8 @@ const stripHtml = require('string-strip-html')
 
 const token = process.env.SHOPIFY_ACCESS_TOKEN;
 const PRODUCTS_PER_REQUEST = 250;
-const DISPLAY_WAS_NOW_PRICING = true // should Facebook display RRP vs price, or just the price?
+const DISPLAY_WAS_NOW_PRICING_FACEBOOK = true // should Facebook display RRP vs price, or just the price?
+const DISPLAY_WAS_NOW_PRICING_GOOGLE = false;
 
 const app = express();
 
@@ -73,14 +74,15 @@ async function buildGoogleFeed(){
         if(prices){
             if(prices.price) p['g:price'][0] = `${prices.price} NZD`;
             if(prices.sale_price) {
-                if(p['g:sale_price']){
-                    p['g:sale_price'][0] = `${prices.sale_price} NZD`;
+                const keyString = DISPLAY_WAS_NOW_PRICING_GOOGLE ? 'g:sale_price' : 'g:price';                
+                if(p[keyString]){
+                    p[keyString][0] = `${prices.sale_price} NZD`;
                 } else {
-                    p['g:sale_price'] = [`${prices.sale_price} NZD`];
+                    p[keyString] = [`${prices.sale_price} NZD`];
                 }
             } else {
                 if(p['g:sale_price']) delete p['g:sale_price'];
-                console.log(`No sale price for ${p['g:id'][0]} - ${p['g:title'][0]}`);
+                console.log(`No sale price provided for ${p['g:id'][0]} - ${p['title'][0]}`);
             }
         }
         else {
@@ -225,7 +227,7 @@ function retrievePrices(priceList, idString){
         return false;
     }
 
-    return DISPLAY_WAS_NOW_PRICING ? 
+    return DISPLAY_WAS_NOW_PRICING_FACEBOOK ? 
     {
         price: product.compare_at_price || product.price,
         sale_price: product.compare_at_price ? product.price : undefined
